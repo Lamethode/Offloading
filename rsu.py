@@ -45,7 +45,7 @@ class  RSU :
       self.resource_task_u=resource_task_u
       self.resource_serv=resource_serv
       self.delta_t=0.5
-      return ((self.a*self.Task_size_u*(self.resource_task_u-self.resource_serv)/(self.R_lan*self.resource_task_u+0.001))+self.RSU_connect*self.delta_t)
+      return ((self.a*self.Task_size_u*(self.resource_task_u-self.resource_serv)/(self.R_lan*self.resource_task_u+0.0001))+self.RSU_connect*self.delta_t)
 
    def liste_time_rsu_cloud(self,a_list,ressource_serv,resource_required,RSU,sub_task_u,liste_dir,liste_dir_task):
     liste_dir,liste_dir_task

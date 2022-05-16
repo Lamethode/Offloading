@@ -12,16 +12,21 @@ from env import *
 from memory import *
 from agent import *
 
-class SuperAgent_serv:
-    def __init__(self,vehicle_serv,serv_memory,state,price_base,liste_dir,path_save=PATH_SAVE_MODEL, path_load=PATH_LOAD_FOLDER):
+class SuperAgent:
+    def __init__(self,vehicle,memory,state,action,types,path_save=PATH_SAVE_MODEL, path_load=PATH_LOAD_FOLDER):
         self.path_save = path_save
-        vehicle_serv,serv_memory,state,price_base,liste_dir=vehicle_serv,serv_memory,state,price_base,liste_dir
+        self.types=types
+        vehicle,memory,state,action=vehicle,memory,state,action
         self.path_load = path_load
-        self.replay_buffer = serv_memory
-        self.agents = [[Agent_serv(vehicle_serv,j,state,price_base) for j in range(liste_dir[p])] for p in range(len(liste_dir))]
+        self.replay_buffer = memory
+        if self.types=='s':
+              self.agents = [Agent_serv(vehicle,j,state,action) for j in range(len(vehicle))]
+        elif self.types=='t':
+              self.agents = [Agent_task(vehicle,j,state,action) for j in range(len(vehicle))]
+
         
     def get_actions(self, agents_states):
-        list_actions = [self.agents[index].get_actions(agents_states[index]) for index in range(self.n_agents)]
+        list_actions = [self.agents[index].get_actions(agents_states[index]) for index in range(len(self.agents))]
         return list_actions
     
     def save(self):
@@ -41,3 +46,41 @@ class SuperAgent_serv:
             agent.load(full_path)
             
         self.replay_buffer.load(full_path)
+
+    def train(self):
+        if self.replay_buffer.check_buffer_size() == False:
+            return
+        
+        state, reward, next_state, done, actors_state, actors_next_state, actors_action = self.replay_buffer.get_minibatch()
+        
+        states = tf.convert_to_tensor(state, dtype=tf.float32)
+        rewards = tf.convert_to_tensor(reward, dtype=tf.float32)
+        next_states = tf.convert_to_tensor(next_state, dtype=tf.float32)
+        
+        actors_states = [tf.convert_to_tensor(s, dtype=tf.float32) for s in actors_state]
+        actors_next_states = [tf.convert_to_tensor(s, dtype=tf.float32) for s in actors_next_state]
+        actors_actions = [tf.convert_to_tensor(s, dtype=tf.float32) for s in actors_action]
+        
+        with tf.GradientTape(persistent=True) as tape:
+            target_actions = [self.agents[index].target_actor(actors_next_states[index]) for index in range(len(self.agents))]
+            policy_actions = [self.agents[index].actor(actors_states[index]) for index in range(len(self.agents))]
+            
+            concat_target_actions = tf.concat(target_actions, axis=1)
+            concat_policy_actions = tf.concat(policy_actions, axis=1)
+            concat_actors_action = tf.concat(actors_actions, axis=1)
+            
+            target_critic_values = [tf.squeeze(self.agents[index].target_critic(next_states, concat_target_actions), 1) for index in range(len(self.agents))]
+            critic_values = [tf.squeeze(self.agents[index].critic(states, concat_actors_action), 1) for index in range(len(self.agents))]
+            targets = [rewards[:, index] + self.agents[index].gamma * target_critic_values[index] * (1-done[:, index]) for index in range(len(self.agents))]
+            critic_losses = [tf.keras.losses.MSE(targets[index], critic_values[index]) for index in range(len(self.agents))]
+            
+            actor_losses = [-self.agents[index].critic(states, concat_policy_actions) for index in range(len(self.agents))]
+            actor_losses = [tf.math.reduce_mean(actor_losses[index]) for index in range(len(self.agents))]
+        
+        critic_gradients = [tape.gradient(critic_losses[index], self.agents[index].critic.trainable_variables) for index in range(len(self.agents))]
+        actor_gradients = [tape.gradient(actor_losses[index], self.agents[index].actor.trainable_variables) for index in range(len(self.agents))]
+        
+        for index in range(len(self.agents)):
+            self.agents[index].critic.optimizer.apply_gradients(zip(critic_gradients[index], self.agents[index].critic.trainable_variables))
+            self.agents[index].actor.optimizer.apply_gradients(zip(actor_gradients[index], self.agents[index].actor.trainable_variables))
+            self.agents[index].update_target_networks(self.agents[index].tau)

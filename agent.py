@@ -25,8 +25,8 @@ class Agent_serv:
         self.state=state
         self.state=np.array(state)
         self.action=np.array(price_base)
-        self.actor_dims = self.state.shape[2]
-        self.n_actions = self.action.shape[2]
+        self.actor_dims = 4 # la dimentions des états
+        self.n_actions = 1  # la dimension des actions
         
         self.agent_name = "agent_number_{}".format(self.i)
         
@@ -82,13 +82,20 @@ class Agent_serv:
         return actions.numpy()[0]"""
 
     # définir get state
+    def get_actions(self, actor_states):
+        #noise = tf.random.uniform(shape=[self.n_actions])
+        actions = self.actor(actor_states)
+        actions = actions# + noise
 
+        return actions.numpy()[0]
     
 
 
     def train(self):
-
-        state, reward, next_state, actors_state, actors_next_state, actors_action = self.replay_buffer.get_minibatch()
+        if self.replay_buffer.check_buffer_size() == False:
+            return
+        
+        state, reward, next_state, done, actors_state, actors_next_state, actors_action,actor_rewards = self.replay_buffer.get_minibatch()
         
         states = tf.convert_to_tensor(state, dtype=tf.float32)
         rewards = tf.convert_to_tensor(reward, dtype=tf.float32)
@@ -97,47 +104,55 @@ class Agent_serv:
         actors_states = [tf.convert_to_tensor(s, dtype=tf.float32) for s in actors_state]
         actors_next_states = [tf.convert_to_tensor(s, dtype=tf.float32) for s in actors_next_state]
         actors_actions = [tf.convert_to_tensor(s, dtype=tf.float32) for s in actors_action]
-        
+        actors_rewards = [tf.convert_to_tensor(s, dtype=tf.float32) for s in actor_rewards]
+
         with tf.GradientTape(persistent=True) as tape:
-            target_actions = [self.agents[index].target_actor(actors_next_states[index]) for index in range(self.n_agents)]
-            policy_actions = [self.agents[index].actor(actors_states[index]) for index in range(self.n_agents)]
+            target_actions = [self.agents[index].target_actor(actors_actions[index]) for index in range(len(self.agents))]
+            policy_actions = [self.agents[index].actor(actors_rewards[index]) for index in range(len(self.agents))]
             
             concat_target_actions = tf.concat(target_actions, axis=1)
             concat_policy_actions = tf.concat(policy_actions, axis=1)
             concat_actors_action = tf.concat(actors_actions, axis=1)
             
-            target_critic_values = [tf.squeeze(self.agents[index].target_critic(next_states, concat_target_actions), 1) for index in range(self.n_agents)]
-            critic_values = [tf.squeeze(self.agents[index].critic(states, concat_actors_action), 1) for index in range(self.n_agents)]
-            targets = [rewards[:, index] + self.agents[index].gamma * target_critic_values[index] * (1-done[:, index]) for index in range(self.n_agents)]
-            critic_losses = [tf.keras.losses.MSE(targets[index], critic_values[index]) for index in range(self.n_agents)]
+            target_critic_values = [tf.squeeze(self.agents[index].target_critic(next_states, concat_target_actions), 1) for index in range(len(self.agents))]
+            critic_values = [tf.squeeze(self.agents[index].critic(states, concat_actors_action), 1) for index in range(len(self.agents))]
+            targets = [rewards[:, index] + self.agents[index].gamma * target_critic_values[index] * (1-done[:, index]) for index in range(len(self.agents))]
+            critic_losses = [tf.keras.losses.MSE(targets[index], critic_values[index]) for index in range(len(self.agents))]
             
-            actor_losses = [-self.agents[index].critic(states, concat_policy_actions) for index in range(self.n_agents)]
-            actor_losses = [tf.math.reduce_mean(actor_losses[index]) for index in range(self.n_agents)]
+            actor_losses = [-self.agents[index].critic(states, concat_policy_actions) for index in range(len(self.agents))]
+            actor_losses = [tf.math.reduce_mean(actor_losses[index]) for index in range(len(self.agents))]
         
-        critic_gradients = [tape.gradient(critic_losses[index], self.agents[index].critic.trainable_variables) for index in range(self.n_agents)]
-        actor_gradients = [tape.gradient(actor_losses[index], self.agents[index].actor.trainable_variables) for index in range(self.n_agents)]
+        critic_gradients = [tape.gradient(critic_losses[index], self.agents[index].critic.trainable_variables) for index in range(len(self.agents))]
+        actor_gradients = [tape.gradient(actor_losses[index], self.agents[index].actor.trainable_variables) for index in range(len(self.agents))]
         
-        for index in range(self.n_agents):
+        for index in range(len(self.agents)):
             self.agents[index].critic.optimizer.apply_gradients(zip(critic_gradients[index], self.agents[index].critic.trainable_variables))
             self.agents[index].actor.optimizer.apply_gradients(zip(actor_gradients[index], self.agents[index].actor.trainable_variables))
             self.agents[index].update_target_networks(self.agents[index].tau)
+
      #######################SERVICE#########################################################""
 
 
 
-class Agent_Task:
-    def __init__(self, env_serv,vehicule_service ,n_agent, actor_lr=ACTOR_LR, critic_lr=CRITIC_LR, gamma=GAMMA, tau=TAU):
+class Agent_task:
+    def __init__(self,vehicule_service,i,state,action, actor_lr=ACTOR_LR, critic_lr=CRITIC_LR, gamma=GAMMA, tau=TAU):
        #######################SERVICE#########################################################"" 
-        n_agent=vehicule_tache.nombre
         self.gamma = gamma
         self.tau = tau
         self.actor_lr = actor_lr
         self.critic_lr = critic_lr
-        
-        self.actor_dims = len(self.state_space[n_agent])
-        self.n_actions = len(ServiceVehicle.action_space[n_agent])
-        
-        self.agent_name = "agent_number_{}".format(n_agent)
+        self.i=i
+        self.state=state
+        self.state=np.array(state)
+        self.action=np.array(action)
+        if len(self.state.shape)==2:
+            self.actor_dims = self.state.shape[1]
+            self.n_actions = self.action.shape[1]
+        else:
+          self.actor_dims = self.state.shape[0]
+          self.n_actions = self.action.shape[0]
+
+        self.agent_name = "agent_number_{}".format(self.i)
         
         self.actor = Actor("actor_" + self.agent_name, self.n_actions)
         self.critic = Critic("critic_" + self.agent_name)
@@ -199,8 +214,10 @@ class Agent_Task:
 
 
     def train(self):
-
-        state, reward, next_state, actors_state, actors_next_state, actors_action = self.replay_buffer.get_minibatch()
+        if self.replay_buffer.check_buffer_size() == False:
+            return
+        
+        state, reward, next_state, done, actors_state, actors_next_state, actors_action = self.replay_buffer.get_minibatch()
         
         states = tf.convert_to_tensor(state, dtype=tf.float32)
         rewards = tf.convert_to_tensor(reward, dtype=tf.float32)
@@ -211,26 +228,25 @@ class Agent_Task:
         actors_actions = [tf.convert_to_tensor(s, dtype=tf.float32) for s in actors_action]
         
         with tf.GradientTape(persistent=True) as tape:
-            target_actions = [self.agents[index].target_actor(actors_next_states[index]) for index in range(self.n_agents)]
-            policy_actions = [self.agents[index].actor(actors_states[index]) for index in range(self.n_agents)]
+            target_actions = [self.agents[index].target_actor(actors_next_states[index]) for index in range(len(self.agents))]
+            policy_actions = [self.agents[index].actor(actors_states[index]) for index in range(len(self.agents))]
             
             concat_target_actions = tf.concat(target_actions, axis=1)
             concat_policy_actions = tf.concat(policy_actions, axis=1)
             concat_actors_action = tf.concat(actors_actions, axis=1)
             
-            target_critic_values = [tf.squeeze(self.agents[index].target_critic(next_states, concat_target_actions), 1) for index in range(self.n_agents)]
-            critic_values = [tf.squeeze(self.agents[index].critic(states, concat_actors_action), 1) for index in range(self.n_agents)]
-            targets = [rewards[:, index] + self.agents[index].gamma * target_critic_values[index] * (1-done[:, index]) for index in range(self.n_agents)]
-            critic_losses = [tf.keras.losses.MSE(targets[index], critic_values[index]) for index in range(self.n_agents)]
+            target_critic_values = [tf.squeeze(self.agents[index].target_critic(next_states, concat_target_actions), 1) for index in range(len(self.agents))]
+            critic_values = [tf.squeeze(self.agents[index].critic(states, concat_actors_action), 1) for index in range(len(self.agents))]
+            targets = [rewards[:, index] + self.agents[index].gamma * target_critic_values[index] * (1-done[:, index]) for index in range(len(self.agents))]
+            critic_losses = [tf.keras.losses.MSE(targets[index], critic_values[index]) for index in range(len(self.agents))]
             
-            actor_losses = [-self.agents[index].critic(states, concat_policy_actions) for index in range(self.n_agents)]
-            actor_losses = [tf.math.reduce_mean(actor_losses[index]) for index in range(self.n_agents)]
+            actor_losses = [-self.agents[index].critic(states, concat_policy_actions) for index in range(len(self.agents))]
+            actor_losses = [tf.math.reduce_mean(actor_losses[index]) for index in range(len(self.agents))]
         
-        critic_gradients = [tape.gradient(critic_losses[index], self.agents[index].critic.trainable_variables) for index in range(self.n_agents)]
-        actor_gradients = [tape.gradient(actor_losses[index], self.agents[index].actor.trainable_variables) for index in range(self.n_agents)]
+        critic_gradients = [tape.gradient(critic_losses[index], self.agents[index].critic.trainable_variables) for index in range(len(self.agents))]
+        actor_gradients = [tape.gradient(actor_losses[index], self.agents[index].actor.trainable_variables) for index in range(len(self.agents))]
         
-        for index in range(self.n_agents):
+        for index in range(len(self.agents)):
             self.agents[index].critic.optimizer.apply_gradients(zip(critic_gradients[index], self.agents[index].critic.trainable_variables))
             self.agents[index].actor.optimizer.apply_gradients(zip(actor_gradients[index], self.agents[index].actor.trainable_variables))
             self.agents[index].update_target_networks(self.agents[index].tau)
-     #######################SERVICE#########################################################""

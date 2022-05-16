@@ -17,7 +17,7 @@ def a_list(resource_required,liste_dir_task,liste_dir):
                 for j in range(1,liste_dir[p]+1):
                     h=(resource_required[p][i][j])/sum(resource_required[p][i])
                     if h==0:
-                      h=0.01
+                      h=0.0001
                       l.append(h)
                     else:
                       l.append(h)
@@ -27,13 +27,14 @@ def a_list(resource_required,liste_dir_task,liste_dir):
 
 
 class  Vehicle:
-      # Vehicle simulator: include all the information for a vehicle
+      # Vehicle simulator: include all the uniformation for a vehicle
       #time -time of the simulation
       #timstep  - duration of one calculation step (seconds)
-    def __init__(self, start_position, start_direction,velocity):
+    def __init__(self, start_position, start_direction,velocity,indexe):
         self.position = start_position
         self.direction = start_direction
         self.velocity = velocity
+        self.indexe=indexe
         self.neighbors = []
         self.destinations = []
 
@@ -41,20 +42,20 @@ class  Vehicle:
 class  ServiceVehicle(Vehicle):
 
     """ Vehicle that can receive offloaded tasks """
-    def __init__(self, start_position, start_direction,velocity):
-        super().__init__(start_position, start_direction,velocity)  
-        #time: int  time_step:float, information:list
+    def __init__(self, start_position, start_direction,velocity,indexe):
+        super().__init__(start_position, start_direction,velocity,indexe)  
+        #time: int  time_step:float, uniformation:list
         #self.p_base=p_base # prix de base pour une unité de calcul pour le véhicule de service
         #self.resource=random.randint(2000,5000) #(MHz)
-        self.e=4*10**(-9)*10**(6)
-        self.k= 2*10**(-4)*10**(6)
+        self.e=4*1**(-9)*1**(6)
+        self.k= 2*1**(-4)*1**(6)
 
         self.directions=['d','u','l','r']
 
     def price_unit(self,price_cloud):
       self.price_cloud=price_cloud
       
-      price=random.randint(self.price_cloud,500)
+      price=random.randint(self.price_cloud,15)
       return price
     
     def action_space(self,vehicle_serv): #action d'un véhicule
@@ -89,15 +90,19 @@ class  ServiceVehicle(Vehicle):
             continue       
       return [d,u,l,r] #liste en [i,j]
 
-    def action_space_l(self,liste_dir):
+    def action_space_l(self,liste_dir,liste_dir_task,num_task_vehicle):
       self.price_cloud=cloud.Pcloud
       liste_dir=liste_dir
+      liste_dir_task=liste_dir_task
       liste=[]
       for p in range(len(liste_dir)):
         l=[]
         for i in range(liste_dir[p]):
             k=[]
-            k.append(self.price_unit(self.price_cloud))
+            if liste_dir_task[p] <= int(num_task_vehicle/4):
+              k.append(self.price_unit(self.price_cloud))
+            else:
+              k.append(self.price_unit(self.price_cloud)+random.randint(1,3))
             l.append(k)
         liste.append(l)
       return liste
@@ -265,8 +270,8 @@ class  ServiceVehicle(Vehicle):
     def price_task_u (self,price_base,global_list_sub_task,resource_required,resource,liste_dir,liste_dir_task): # liste des prix des services des véhicules de services pour les taches U par véhicule de tache
           self.liste_dir,self.liste_dir_task=liste_dir,liste_dir_task
           self.global_list_sub_task=global_list_sub_task # prendre les M sous-taches
-          self.price_factor=2*10**(-5)
-          self.server_factor=2*10**(-3)
+          self.price_factor=2*1**(-5)
+          self.server_factor=2*1**(-3)
           self.resource_required=resource_required
           self.price_base=price_base
           self.resource=resource
@@ -286,64 +291,47 @@ class  ServiceVehicle(Vehicle):
               liste_global.append(liste)
           return liste_global # liste en [i,j]
 
-    def time_exec(self,a,size_u,cpu_u_required,data_rate):
-      self.a=a
-      self.size_u=size_u
-      self.data_rate=data_rate
-      self.cpu_u_required=cpu_u_required
-      return ((a*cpu_u_required*size_u)/data_rate)
+    def time_exec(self,a,size_u,cpu_u_required,resource_per_task):
+      a=a
+      size_u=size_u
+      resource_per_task=resource_per_task
+      cpu_u_required=cpu_u_required
+      return ((a*cpu_u_required*size_u)/(resource_per_task))
 
-    def list_time_exec(self,a_list,list_sub_task,data_rate_list,liste_dir,liste_dir_task): #a terminer
-      self.a_list=a_list
-      self.data_rate_list=data_rate_list
-      self.list_sub_task=list_sub_task
-      self.data_rate_list=data_rate_list
+    def list_time_exec(self,a_list,list_sub_task,resource_per_task,liste_dir,liste_dir_task): #a terminer
+      a_list=a_list
+      resource_per_task=resource_per_task
+      list_sub_task=list_sub_task
+       #self.data_rate_list=data_rate_list
       big_list=[]
-      for p in range(len(self.liste_dir)):
+      for p in range(len(liste_dir)):
           m=[]
-          for i in range(self.liste_dir_task[p]):
+          for i in range(liste_dir_task[p]):
             liste=[]
-            for j in range(1,self.liste_dir[p]+1):
-              liste.append(self.time_exec(a_list[p][i][j-1],self.list_sub_task[p][i][j][0],self.list_sub_task[p][i][j][1],self.data_rate_list[p][i][j-1]))
+            for j in range(1,liste_dir[p]+1):
+              liste.append(self.time_exec(a_list[p][i][j-1],list_sub_task[p][i][j][0],list_sub_task[p][i][j][1],resource_per_task[p][i]))
             m.append(liste)
           big_list.append(m)
-      return big_list # liste en [i,j] 
+      return big_list # liste en [i, 
         
   
-    def send_to_cloud_msg (self,service_vehicle,resource_service) :
+    def send_to_cloud_msg (self,resource_service,liste_dir) :
        # vérifie si le vehicule de service a envoyer un message de déchargement de calcul au serveur cloud 
        # si oui, utiliser la fréquence de resolution de la tache en surpluse pour calculer la tache avec le serveru cloud
       liste=[]
-      d,u,l,r=[],[],[],[]
-      self.service_vehicle=service_vehicle
-      self.resource_service=resource_service
-      dd,uu,ll,rr=0,0,0,0
-      for i in range(len(self.service_vehicle)):
-            if self.service_vehicle[i].direction=='d':
-                if resource_service[0][dd]<0:
-                  d.append(True)
-                else:
-                  d.append(False)
-                dd +=1
-            elif self.service_vehicle[i].direction=='u':
-                if resource_service[1][uu]<0:
-                  u.append(True)
-                else:
-                  u.append(False)
-                uu +=1
-            elif self.service_vehicle[i].direction=='l':
-                if resource_service[2][ll]<0:
-                  l.append(True)
-                else:
-                  l.append(False)
-                ll +=1
-            elif self.service_vehicle[i].direction=='r':
-                if resource_service[3][rr]<0:
-                  r.append(True)
-                else:
-                  r.append(False)
-                rr +=1
-      return [d,u,l,r]
+      #d,u,l,r=[],[],[],[]
+      liste_dir=liste_dir
+      resource_service=resource_service
+      #dd,uu,ll,rr=0,0,0,0
+      for p in range(len(liste_dir)):
+            l=[]
+            for i in range(liste_dir[p]):
+                  if resource_service[p][i]<=0:
+                    l.append(True)
+                  else:
+                    l.append(False)
+            liste.append(l)
+      return liste
 
 
     def return_time(self,a,size_u,data_rate):
@@ -351,7 +339,7 @@ class  ServiceVehicle(Vehicle):
         self.a=a
         self.size_u=size_u
         self.data_rate=data_rate
-        return ((self.a*self.b_u*self.size_u)/self.data_rate)
+        return ((self.a*self.b_u*self.size_u)/(self.data_rate*1**(-9)))
 #liste
     def liste_return_time(self,a_liste,liste_sub_task,liste_data_rate,liste_dir,liste_dir_task):
         self.liste_dir,self.liste_dir_task=liste_dir,liste_dir_task
@@ -432,7 +420,7 @@ class  ServiceVehicle(Vehicle):
     
     def third_term (self,resource_cloud_used:list,liste_dir):
       self.liste_dir=liste_dir
-      self.p_cloud=1.5*10**(-3)
+      self.p_cloud=1.5*1**(-3)
       self.resource_cloud_used=resource_cloud_used
       for p in range(len(self.liste_dir)):
           for i in range(self.liste_dir[p]):
@@ -474,8 +462,8 @@ class  TaskVehicle(Vehicle):
     temps de transmission                   et de reception de la taches
 
     """
-    def __init__(self, start_position, start_direction,velocity):
-        super().__init__(start_position, start_direction,velocity) #time: int  time_step:float, information:list
+    def __init__(self, start_position, start_direction,velocity,indexe):
+        super().__init__(start_position, start_direction,velocity,indexe) #time: int  time_step:float, uniformation:list
         
         self.computation_power= 2200  #(MHz)
         self.directions=['d','u','l','r']
@@ -491,24 +479,24 @@ class  TaskVehicle(Vehicle):
 
 #liste
     
-    def exec_time(self,n_cpu_required,sub_task_u,resource_required):
+    def exec_time(self,n_cpu_required,sub_task_u,resource_per_task):
       self.n_cpu_required=n_cpu_required
       self.sub_task_u=sub_task_u
-      self.resource_required=resource_required
+      self.resource_required=resource_per_task
       return ((self.n_cpu_required*self.sub_task_u)/self.resource_required)
 #liste
 
-    def local_time(self,list_sub_task,resource_required,liste_dir_task):
+    def local_time(self,list_sub_task,resource_per_task,liste_dir_task):
       liste=[]
       self.liste_dir_task=liste_dir_task
       self.l=list_sub_task
-      self.p=resource_required
+      self.p=resource_per_task
       for p in range(len(self.liste_dir_task)):    
           m=[]
           #k=[]
           for i in range(self.liste_dir_task[p]):
                     #k=[]  
-                    elt=self.exec_time(self.l[p][i][0][1],self.l[p][i][0][0],self.p[p][i][0])
+                    elt=self.exec_time(self.l[p][i][0][1],self.l[p][i][0][0],self.p[p][i])
                     m.append(elt)
           #m.append(k)
           liste.append(m)
@@ -659,12 +647,13 @@ class  TaskVehicle(Vehicle):
       self.resource=resource
       self.ressource_u=ressource_u
       
-      return (self.resource-(ressource_u)) # chaque traitement de sous-tache en local prendre 10% des ressources disponibles
+      return (self.resource-(ressource_u)) # chaque traitement de sous-tache en local prendre 1% des ressources disponibles
 #liste
     
     def liste_update_ressource(self,resource,resource_u,liste_dir,liste_dir_task):
         self.resource=resource
         self.resource_u=resource_u
+        self.liste_dir,self.liste_dir_task=liste_dir,liste_dir_task
         for i in range(len(self.liste_dir)):
             for j in range(self.liste_dir_task[i]):
                 if self.resource[i][j]<=0:
@@ -673,84 +662,33 @@ class  TaskVehicle(Vehicle):
                     self.resource[i][j]-=self.resource_u[i][j][0]
         return self.resource
         
-    def list_resource_required(self,task_to_subtask,task_vehicle,service_vehicle,liste_dir): # liste des actions des vehciles de taches
-      d=[]
-      u=[]
-      l=[]
-      r=[]
-      self.task_to_subtask=task_to_subtask
-      self.task_vehicle=task_vehicle
-      self.service_vehicle=service_vehicle
-      self.liste_dir=liste_dir
-      ddi,uui,lli,rri=0,0,0,0,
-      for i in range(len(self.task_vehicle)):
+    def list_resource_required(self,task_to_subtask,n_serv,liste_dir,liste_dir_task): # liste des actions des vehciles de taches
+      liste=[]
+      task_to_subtask=task_to_subtask
+      n_serv=n_serv
+      liste_dir=liste_dir
+      for p in range(len(liste_dir)):
         m=[]
-        if self.task_vehicle[i].direction=='d':
-            self.resource_required=random.randint(int((self.task_to_subtask[0][0][0][1])/self.liste_dir[0])+3,int((500/10))) # resource requis pour le calcul de la sous-tache
-            m.append(self.resource_required)
-            for j in range(1,self.liste_dir[0]+1):
-                    if self.liste_dir[0]<=(len(self.service_vehicle)/4):
-                        resource_required=random.randint(int((self.task_to_subtask[0][1][j][1])/(int(len(self.service_vehicle)/4))),int((500/10))) # resource requis pour le calcul de la sous-tache
-                        m.append(resource_required)
-                    else:
-                        resource_required=random.randint(int((self.task_to_subtask[0][1][j][1])/self.liste_dir[0])+3,int((500/20))) # resource requis pour le calcul de la sous-tache
-                        m.append(resource_required)
-                
-                                                     
-            ddi+=1
-        
-            d.append(m)  
-        #t+=1
-            continue
-        
-        if self.task_vehicle[i].direction=='u':
-            self.resource_required=random.randint(int((self.task_to_subtask[1][0][0][1])/self.liste_dir[1])+3,int((500/10))) # resource requis pour le calcul de la sous-tache
-            m.append(self.resource_required)
-            for j in range(1,self.liste_dir[1]+1):
-                    if self.liste_dir[1]<=(len(self.service_vehicle)/4):
-                        resource_required=random.randint(int((self.task_to_subtask[1][1][j][1])/(int(len(self.service_vehicle)/4))),int((500/10))) # resource requis pour le calcul de la sous-tache
-                        m.append(resource_required)
-                    else:
-                        resource_required=random.randint(int((self.task_to_subtask[1][1][j][1])/self.liste_dir[1]),int((500/20))) # resource requis pour le calcul de la sous-tache
-                        m.append(resource_required)
-                
-                                                     
-            uui+=1
-        
-            u.append(m)  
-       # t+=1
-            continue  
-        if self.task_vehicle[i].direction=='l':
-            self.resource_required=random.randint(int((self.task_to_subtask[2][0][0][1])/self.liste_dir[2])+3,int((500/10))) # resource requis pour le calcul de la sous-tache
-            m.append(self.resource_required)
-            for j in range(1,self.liste_dir[2]+1):
-                    if self.liste_dir[2]<=(len(self.service_vehicle)/4):
-                        resource_required=random.randint(int((self.task_to_subtask[2][1][j][1])/(int(len(self.service_vehicle)/4))),int((500/10))) # resource requis pour le calcul de la sous-tache
-                        m.append(resource_required)
-                    else:
-                        resource_required=random.randint(int((self.task_to_subtask[2][1][j][1])/self.liste_dir[2]),int((500/20))) # resource requis pour le calcul de la sous-tache
-                        m.append(resource_required)                                
-            lli+=1
-            l.append(m)  
-        #t+=1
-            continue
-        
-        if self.task_vehicle[i].direction=='r':
-            self.resource_required=random.randint(int((self.task_to_subtask[3][0][0][1])/self.liste_dir[3])+3,int((500/10))) # resource requis pour le calcul de la sous-tache
-            m.append(self.resource_required)
-            for j in range(1,self.liste_dir[3]+1):
-                    if self.liste_dir[3]<=(len(self.service_vehicle)/4):
-                        resource_required=random.randint(int((self.task_to_subtask[3][1][j][1])/(int(len(self.service_vehicle)/4))),int((500/10))) # resource requis pour le calcul de la sous-tache
-                        m.append(resource_required)
-                    else:
-                        resource_required=random.randint(int((self.task_to_subtask[3][1][j][1])/self.liste_dir[3]),int((500/20))) # resource requis pour le calcul de la sous-tache
-                        m.append(resource_required)                                
-            rri+=1
-            r.append(m)  
-        #t+=1
-            continue
-        
-      return [d,u,l,r]
+        ri=0
+        if ri==0:
+
+          for i in range(liste_dir_task[p]):
+              l=[]
+              resource_required=int(task_to_subtask[p][i][0][1]*task_to_subtask[p][i][0][0]/task_to_subtask[p][i][0][3])+random.randint(0,2) # resource requis pour le calcul de la sous-tache
+              l.append(resource_required)
+              for j in range(1,liste_dir[p]+1):
+                      if liste_dir[p]<=int(n_serv/4):
+                          resource_required=int((random.uniform(0,1)*task_to_subtask[p][i][j][1]*task_to_subtask[p][i][j][0]/task_to_subtask[p][i][j][3]))+random.randint(0,2)+random.randint(0,5) # resource requis pour le calcul de la sous-tache
+                          l.append(resource_required)
+                      elif liste_dir[p]>int(n_serv/4):
+                          resource_required=int((random.uniform(0,1)*task_to_subtask[p][i][j][1]*task_to_subtask[p][i][j][0]/task_to_subtask[p][i][j][3]))+random.randint(0,2)# resource requis pour le calcul de la sous-tache
+                          l.append(resource_required)
+                      else:
+                          resource_required=int((random.uniform(0,1)*task_to_subtask[p][i][j][1]*task_to_subtask[p][i][j][0]/task_to_subtask[p][i][j][3]))+random.randint(0,2)# resource requis pour le calcul de la sous-tache
+                          l.append(resource_required)
+              m.append(l)
+          liste.append(m)     
+      return liste
 
     def action_space(self,ressource):
         self.action=ressource
@@ -762,7 +700,7 @@ class  TaskVehicle(Vehicle):
         for p in range(len(liste_dir_task)):
           l=[]
           for i in range(liste_dir_task[p]):
-            time=global_l[p][i][1]*global_l[p][i][0]/ressource[p][i]
+            time=global_l[p][i][1]*global_l[p][i][0]/(ressource[p][i]+0.0001)
             l.append(time)
           liste.append(l)
         return liste
@@ -816,7 +754,7 @@ class  TaskVehicle(Vehicle):
       self.resource_service=resource_service
       self.data_rate_v2i=data_rate_v2i
 
-      return ((self.a*size_u*(resource_required-resource_service))/(data_rate_v2i*resource_required+0.01))
+      return ((self.a*size_u*(resource_required-resource_service))/(data_rate_v2i*resource_required+0.0001))
 #liste
 
     def list_time_to_rsu(self,a_list,global_list_sub_tasks,list_data_rate_v2i,ressource_required,service_ressource,liste_dir_task):
@@ -842,7 +780,7 @@ class  TaskVehicle(Vehicle):
       self.a=a
       self.sub_task_u=sub_task_u
       self.data_rate_v2v=data_rate_v2v
-      return ((self.a*self.sub_task_u)/self.data_rate_v2v)
+      return ((self.a*self.sub_task_u)/(self.data_rate_v2v*10**(-8)))
 #liste
     def list_time_to_service(self,a_list,global_list_sub_tasks,list_data_rate_v2v,liste_dir,liste_dir_task):
       k=[]
@@ -955,11 +893,11 @@ class Task:
         
         def tasks_generation(self):  # Ok
           task=[]
-          self.size=random.randint(1000,1700)
+          self.size=random.randint(100,1700)
           task.append(self.size)
-          self.n_cpu=random.randint(200,500)
+          self.n_cpu=self.size*random.randint(300,700)*10**(-4)
           task.append(self.n_cpu)
-          self.b=int(self.size/100)
+          self.b=int(self.size/10)
           task.append(self.b)
           return task #liste en [i]
 
@@ -968,22 +906,26 @@ class Task:
             liste_dir_task=liste_dir_task
             liste=[]
             for p in range(len(liste_dir)):
+                
                 l=[]
-                for i in range(liste_dir_task[p]):
-                  pp=[]
-                  for j in range(liste_dir[p]+1):
-                    sub=[]
-                    size_u=random.randint(int((global_task_l[p][i][0])/(liste_dir[p]+1)),int((global_task_l[p][i][0])/(liste_dir[p]-2)))
-                    sub.append(size_u)
-                    n_cpu_u=random.randint(5,int((global_task_l[p][i][1])/liste_dir[p]+1))
-                    sub.append(n_cpu_u)
-                    b_u=random.randint(1,global_task_l[p][i][2])
-                    sub.append(b_u)
-                    time_u=random.randint(int((global_task_l[p][i][3])/10)+3,int((global_task_l[p][i][3]/5)+5))
-                    sub.append(time_u)
-                    pp.append(sub)
-                  l.append(pp)
-                liste.append(l)
+                r=0
+                if r==0:
+                  for i in range(liste_dir_task[p]):
+                    pp=[]
+                    for j in range(liste_dir[p]+1):
+                      sub=[]
+                      size_u=int((global_task_l[p][i][0])/(liste_dir[p]))+random.randint(0,5)
+                      sub.append(size_u)
+                      n_cpu_u=int((global_task_l[p][i][1])/liste_dir[p])+random.randint(0,5)
+                      sub.append(n_cpu_u)
+                      b_u=int(global_task_l[p][i][2]/liste_dir[p])+random.randint(0,2)
+                      sub.append(b_u)
+                      time_u=int((global_task_l[p][i][3])/liste_dir[p])+random.randint(2,5)
+                      sub.append(time_u)
+                      pp.append(sub)
+                    l.append(pp)
+                  liste.append(l)
+
             return liste
               
 
@@ -1005,7 +947,7 @@ class Task:
                 
                 if self.task_vehicle[i].direction=='d':
                     l=[]
-                    for j in range(self.liste_dir[0]+1):
+                    for j in range(self.liste_dir[p]+1):
                       sub_task=[]
                       self.size_u=random.randint(int((self.global_task[i][0])/(self.liste_dir[0]+1)),int((self.global_task[i][0])/(self.liste_dir[0]-2)))
                       sub_task.append(self.size_u)
@@ -1013,7 +955,7 @@ class Task:
                       sub_task.append(self.n_cpu_u)
                       self.b_u=random.randint(1,self.global_task[i][2])
                       sub_task.append(self.b_u)
-                      self.time_u=random.randint(int((self.global_task[i][3])/10)+3,int((self.global_task[i][3]/5)+5))
+                      self.time_u=random.randint(int((self.global_task[i][3])/1)+3,int((self.global_task[i][3]/5)+5))
                       sub_task.append(self.time_u)
                       l.append(sub_task)
                     liste_for_sub_task_d.append(l)
@@ -1029,7 +971,7 @@ class Task:
                       sub_task.append(self.n_cpu_u)
                       self.b_u=random.randint(1,self.global_task[i][2])
                       sub_task.append(self.b_u)
-                      self.time_u=random.randint(int((self.global_task[i][3])/10)+3,int((self.global_task[i][3]/5)+5))
+                      self.time_u=random.randint(int((self.global_task[i][3])/1)+3,int((self.global_task[i][3]/5)+5))
                       sub_task.append(self.time_u)
                       l.append(sub_task)
                     liste_for_sub_task_u.append(l)
@@ -1045,7 +987,7 @@ class Task:
                       sub_task.append(self.n_cpu_u)
                       self.b_u=random.randint(1,self.global_task[i][2])
                       sub_task.append(self.b_u)
-                      self.time_u=random.randint(int((self.global_task[i][3])/10)+3,int((self.global_task[i][3]/5)+5))
+                      self.time_u=random.randint(int((self.global_task[i][3])/1)+3,int((self.global_task[i][3]/5)+5))
                       sub_task.append(self.time_u)
                       l.append(sub_task)
                     liste_for_sub_task_l.append(l)
@@ -1061,7 +1003,7 @@ class Task:
                       sub_task.append(self.n_cpu_u)
                       self.b_u=random.randint(1,self.global_task[i][2])
                       sub_task.append(self.b_u)
-                      self.time_u=random.randint(int((self.global_task[i][3])/10)+3,int((self.global_task[i][3]/5)+5))
+                      self.time_u=random.randint(int((self.global_task[i][3])/1)+3,int((self.global_task[i][3]/5)+5))
                       sub_task.append(self.time_u)
                       l.append(sub_task)
                     liste_for_sub_task_r.append(l)
@@ -1122,7 +1064,7 @@ class Task:
             liste.append(self.global_task[i][0])
             liste.append(self.global_task[i][1])
             liste.append(self.global_task[i][2])
-            liste.append((self.task_priority*((self.vehicle[i].position[0])**2+(self.vehicle[i].position[1])**2)*self.global_task[i][0])*10**(-6))
+            liste.append((self.task_priority*((self.vehicle)+(self.vehicle))*self.global_task[i][0])/self.global_task[i][1])
             big_list.append(liste)
           return big_list # liste en [i,j]
         
@@ -1158,6 +1100,44 @@ class Task:
                         som=0
                         for j in range(1,self.liste_dir[p]+1):
                             som=som+self.ressource_required[p][i][j-1]
+                        r.append(som)
+                        #liste.append(som)
+                #l.append(liste)
+          #listes.append(l)
+          return [d,u,l,r]
+
+        def total_resource_task_u(self,ressource_required,liste_dir,liste_dir_task): # calcul la somme des resources alloué a la tache repartie entre les véhicules de services
+          self.ressource_required=ressource_required
+          self.liste_dir,self.liste_dir_task=liste_dir,liste_dir_task
+          u=[]
+          d=[]
+          l=[]
+          r=[]
+          #service_vehicle=service_vehicle
+          for p in range(len(self.liste_dir)):
+            if p==0:
+                for i in range(self.liste_dir_task[p]):
+                        som=0
+                        for j in range(1,self.liste_dir[p]+1):
+                            som=som+self.ressource_required[p][i][j]
+                        d.append(som)
+            if p==1:
+                for i in range(self.liste_dir_task[p]):
+                        som=0
+                        for j in range(1,self.liste_dir[p]+1):
+                            som=som+self.ressource_required[p][i][j]
+                        u.append(som)
+            if p==2:
+                for i in range(self.liste_dir_task[p]):
+                        som=0
+                        for j in range(1,self.liste_dir[p]+1):
+                            som=som+self.ressource_required[p][i][j]
+                        l.append(som)
+            if p==3:
+                for i in range(self.liste_dir_task[p]):
+                        som=0
+                        for j in range(1,self.liste_dir[p]+1):
+                            som=som+self.ressource_required[p][i][j]
                         r.append(som)
                         #liste.append(som)
                 #l.append(liste)

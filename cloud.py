@@ -18,7 +18,7 @@ class  CloudServer :
 
     def __init__(self):
         self.ressource=100000000
-        self.Pcloud=random.randint(100,200)
+        self.Pcloud=random.randint(5,10)
         #self.CPU=1000 a vérifié
         self.direction=['d','u','l','r']
     
@@ -31,18 +31,18 @@ class  CloudServer :
             liste.append(l)
         return liste
 
-    def ressource_used(self,check_msg,ressoure_required,initial_cloud,liste_dir):
-        self.check_msg=check_msg
-        self.ressoure_required=ressoure_required
-        self.initial_cloud=initial_cloud
+    def ressource_used(self,check_msg,ressoure_required,initial_cloud,liste_dir,liste_dir_task):
+        check_msg=check_msg
+        ressoure_required=ressoure_required
+        initial_cloud=initial_cloud
         for p in range(len(liste_dir)):
-            for i in range(liste_dir[p]):
-                if self.check_msg[p][i]==False:
+            for j in range(liste_dir[p]):
+              if check_msg[p][j-1]==False:
                     pass
-                else:
-                    for j in range(1,liste_dir[p]+1):
-                        self.initial_cloud[p][j-1]=self.initial_cloud[p][j-1]+self.ressoure_required[p][i][j]
-        return self.initial_cloud
+              else:
+                for i in range(liste_dir_task[p]):
+                      initial_cloud[p][j-1]=initial_cloud[p][j-1]+ressoure_required[p][i][j]
+        return initial_cloud
         
     
     def broadcast_price (self):
@@ -57,7 +57,7 @@ class  CloudServer :
       self.resource_required=resource_required 
       self.resource_required=self.resource_required-self.service_ressource
     
-      return (self.a*self.cpu_u_required*self.Task_size_u)/(self.resource_required)
+      return (self.a*self.cpu_u_required*self.Task_size_u)/(self.resource_required+0.0001)
       # liste pour stocker ces différents temps de calcul à définir 
 
     def liste_exec_time(self,a_liste,subtask,ressources_required,resource_serv,liste_dir,liste_dir_task):
@@ -154,12 +154,12 @@ class  CloudServer :
 
     
     def time_cloud(self,up_time,rsu_cloud_time,exec_time,cloud_rsu_time,down_time): # temps de calcul de la tache u en utilisant la communication v2i
-      self.up_time=up_time
-      self.rsu_cloud_time=rsu_cloud_time
-      self.exec_time=exec_time
-      self.cloud_rsu_time=cloud_rsu_time
-      self.down_time=down_time
-      return (self.up_time+self.rsu_cloud_time+ self.exec_time+self.cloud_rsu_time+self.down_time)
+      up_time=up_time
+      rsu_cloud_time=rsu_cloud_time
+      exec_time=exec_time
+      cloud_rsu_time=cloud_rsu_time
+      down_time=down_time
+      return (up_time+rsu_cloud_time+ exec_time+cloud_rsu_time+down_time)
     
     def liste_time_cloud(self,list_up_time,list_rsu_cloud_time,list_exec_time,list_cloud_rsu_time,list_down_time,check_message,liste_dir,liste_dir_task):
         list_up_time,list_rsu_cloud_time,list_exec_time,list_cloud_rsu_time,list_down_time=list_up_time,list_rsu_cloud_time,list_exec_time,list_cloud_rsu_time,list_down_time

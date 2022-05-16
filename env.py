@@ -40,24 +40,31 @@ class Environnement_task :
 
 
 
-  def add_new_vehicles(self, start_position, start_direction, start_velocity):    
-        self.vehicles.append(TaskVehicle(start_position, start_direction, start_velocity))
+  def add_new_vehicles(self, start_position, start_direction, start_velocity,start_index):    
+        self.vehicles.append(TaskVehicle(start_position, start_direction, start_velocity,start_index))
 
   def add_new_vehicles_by_number(self, n):
+        g=0
         for i in range(n):
+            index=i%int(n/4)+g
             ind = np.random.randint(0,len(self.down_lanes))
             start_position = [self.down_lanes[ind], random.randint(0,self.height)]
             start_direction = 'd'
-            self.add_new_vehicles(start_position,start_direction,random.randint(30,50))
+            start_index=(0,index)
+            self.add_new_vehicles(start_position,start_direction,random.randint(30,50),start_index)
             start_position = [self.up_lanes[ind], random.randint(0,self.height)]
             start_direction = 'u'
-            self.add_new_vehicles(start_position,start_direction,random.randint(30,50))
+            start_index=(1,index)
+            self.add_new_vehicles(start_position,start_direction,random.randint(30,50),start_index)
             start_position = [random.randint(0,self.width), self.left_lanes[ind]]
             start_direction = 'l'
-            self.add_new_vehicles(start_position,start_direction,random.randint(30,50))
+            start_index=(2,index)
+            self.add_new_vehicles(start_position,start_direction,random.randint(30,50),start_index)
             start_position = [random.randint(0,self.width), self.right_lanes[ind]]
             start_direction = 'r'
-            self.add_new_vehicles(start_position,start_direction,random.randint(30,50))
+            start_index=(3,index)
+            self.add_new_vehicles(start_position,start_direction,random.randint(30,50),start_index)
+            g+=1
 
         #self.delta_distance = np.asarray([c.velocity*self.time_slow for c in self.vehicles])
   
@@ -332,24 +339,31 @@ class Environnement_service:
 
 
 
-    def add_new_vehicles(self, start_position, start_direction, start_velocity):    
-        self.vehicles.append(ServiceVehicle(start_position, start_direction, start_velocity))
+    def add_new_vehicles(self, start_position, start_direction, start_velocity,start_index):    
+        self.vehicles.append(ServiceVehicle(start_position, start_direction, start_velocity,start_index))
 
     def add_new_vehicles_by_number(self, n):
+        g=0
         for i in range(n):
+            index=i%int(n/4)+g
             ind = np.random.randint(0,len(self.down_lanes))
             start_position = [self.down_lanes[ind], random.randint(0,self.height)]
             start_direction = 'd'
-            self.add_new_vehicles(start_position,start_direction,random.randint(10,15))
+            start_index=(0,index)
+            self.add_new_vehicles(start_position,start_direction,random.randint(30,50),start_index)
             start_position = [self.up_lanes[ind], random.randint(0,self.height)]
             start_direction = 'u'
-            self.add_new_vehicles(start_position,start_direction,random.randint(10,15))
+            start_index=(1,index)
+            self.add_new_vehicles(start_position,start_direction,random.randint(30,50),start_index)
             start_position = [random.randint(0,self.width), self.left_lanes[ind]]
             start_direction = 'l'
-            self.add_new_vehicles(start_position,start_direction,random.randint(10,15))
+            start_index=(2,index)
+            self.add_new_vehicles(start_position,start_direction,random.randint(30,50),start_index)
             start_position = [random.randint(0,self.width), self.right_lanes[ind]]
             start_direction = 'r'
-            self.add_new_vehicles(start_position,start_direction,random.randint(10,15))
+            start_index=(3,index)
+            self.add_new_vehicles(start_position,start_direction,random.randint(30,50),start_index)
+            g+=1
 
         #self.delta_distance = np.asarray([c.velocity*self.time_slow for c in self.vehicles])
   
